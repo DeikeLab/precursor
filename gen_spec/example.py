@@ -43,7 +43,7 @@ kpHs = kp*np.std(eta_tile)*4;
 print('kpHs = %g' % (kpHs))
 #
 print('Spectrum array shape:', F_kxky_tile.shape)
-path = ".";
+path = "";
 #
 file = "F_kxky_P%.5f_L%gm_N%g_kpHs%g_N_mode%g" % (P, L, N_power, kpHs, N_mode)
 fF = open(path + file, 'bw')
