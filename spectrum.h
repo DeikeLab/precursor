@@ -4,12 +4,17 @@
 The initial condition is a random broad-banded wave field based on externally imported power spectrum. Some spectrum related variables: */
 
 //#define N_mode_ 32 // Corresponds to input of 32 modes in kx and 33 modes in ky. This number has to match the files being read in
-#define N_mode_ 64 // Corresponds to input of 64 modes in kx and 65 modes in ky. This number has to match the files being read in
-double F_kxky_[N_mode_*(N_mode_+1)], omega[N_mode_*(N_mode_+1)], \
-  phase[N_mode_*(N_mode_+1)];
+#define N_mode_ 64 // Corresponds to input of 32 modes in kx and 33 modes in ky. This number has to match the files being read in
+//#define N_mode_ 192 
+/*
+// Corresponds to input of 64 modes in kx and 65 modes in ky. This number has to match the files being read in
+//double F_kxky_[N_mode_*(N_mode_+1)], omega[N_mode_*(N_mode_+1)], \
+//  phase[N_mode_*(N_mode_+1)];
+*/
+double F_kxky_[N_mode_*(N_mode_+1)], phase[N_mode_*(N_mode_+1)];
 double kx_[N_mode_], ky_[N_mode_+1];
 double dkx_, dky_;
-int RANDOM; // integer to seed random number generator (define in spectrum.h)
+//int RANDOM; // integer to seed random number generator (define in spectrum.h)
 
 /**
    Random number generator. */
@@ -81,14 +86,15 @@ void power_input() {
     fprintf(stderr, "ky loaded!\n"), fflush (stderr);
 
     // Wave frequency omega, and randomly generated phase
-    double kmod = 0;
+    //double kmod = 0;
     int index = 0;
     srand(RANDOM); // We can seed it differently for different runs
+    fprintf(stderr, "RANDOM Num. is: %d\n", RANDOM), fflush (stderr);
     for (int i=0; i<N_mode_; i++) {
       for (int j=0; j<N_mode_+1; j++) {
 	index = j*N_mode_ + i;
-	kmod = sqrt(sq(kx_[i]) + sq(ky_[j]));
-	omega[index] = sqrt(g_*kmod);
+	//kmod = sqrt(sq(kx_[i]) + sq(ky_[j]));
+	//omega[index] = sqrt(g_*kmod);
 	phase[index] = randInRange (0, 2.*pi);
       }
     }
@@ -97,7 +103,7 @@ void power_input() {
   MPI_Bcast(&kx_, length1D, MPI_DOUBLE, root, MPI_COMM_WORLD);
   MPI_Bcast(&ky_, length1D+1, MPI_DOUBLE, root, MPI_COMM_WORLD);
   MPI_Bcast(&F_kxky_, length2D, MPI_DOUBLE, root, MPI_COMM_WORLD);
-  MPI_Bcast(&omega, length2D, MPI_DOUBLE, root, MPI_COMM_WORLD);
+  //MPI_Bcast(&omega, length2D, MPI_DOUBLE, root, MPI_COMM_WORLD);
   MPI_Bcast(&phase, length2D, MPI_DOUBLE, root, MPI_COMM_WORLD);
 
   // Make sure that the inputs are correct by printing them out
@@ -157,7 +163,8 @@ void power_input() {
   }
   fclose (fp2);
 
-  // Phase and omega, next focusing phase
+  //// Phase and omega, next focusing phase
+  // Phase, next focusing phase
   double kmod = 0;
   int index = 0;
   srand(RANDOM); // We can seed it differently for different runs
@@ -165,7 +172,7 @@ void power_input() {
     for (int j=0;j<N_mode_+1;j++) {
       index = j*N_mode_ + i;
       kmod = sqrt(sq(kx_[i]) + sq(ky_[j]));
-      omega[index] = sqrt(g_*kmod);
+      //omega[index] = sqrt(g_*kmod);
       phase[index] = randInRange (0, 2.*pi);
     }
   }
@@ -189,6 +196,8 @@ double wave (double x, double y)
   }
   return eta;
 }
+
+/*
 double uin_x (double x, double y, double z) {
   int index = 0;
   double uin_x = 0;
@@ -245,3 +254,4 @@ double uin_z (double x, double y, double z) {
   }
   return uin_z;
 }
+*/
