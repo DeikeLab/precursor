@@ -21,11 +21,12 @@ event perfs (i += 1) {
     char file[80];
     sprintf (file,"perfs.out");
     FILE * fp = fopen(file,"a");
-    if (i == 0)
+    if (i == 0) {
       fprintf (fp,
                "t i dt mgp.i mgp.nrelax mgpf.i mgpf.nrelax mgu.i mgu.nrelax "
                "grid->tn perf.t perf.speed npe\n");
-    fprintf (fp, "%g %d %g %d %d %d %d %d %d %ld %g %g %d\n", 
+    }
+    fprintf (fp, "%.10e %09d %.10e %d %d %d %d %d %d %ld %.10e %.10e %d\n", 
              t, i, dt, mgp.i, mgp.nrelax, mgpf.i, mgpf.nrelax, mgu.i, mgu.nrelax,
              grid->tn, perf.t, perf.speed, npe());
     fclose(fp);

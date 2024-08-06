@@ -17,13 +17,29 @@ and the program terminates. */
 
 static double _maxruntime = HUGE;
 
-event runtime (i += 10) {
+event runtime (i += 5) {
+
+  // Save a restart binary file 5 min before the maxruntime
   mpi_all_reduce (perf.t, MPI_DOUBLE, MPI_MAX);
   if (perf.t >= _maxruntime - 300) { // we allow 5 minutes for termination
     //dump (file = "restart"); // so that we can restart
     dump (file = "restart.bin"); // so that we can restart
-    return 1; // exit
+
+    // Print the physical time and the number of timesteps at which
+    // the simulation prints a dump file
+    if (pid() == 0) {
+      fflush(stderr);
+      char name_1[80];
+      sprintf (name_1,"info_precursor.out");
+      FILE * log_pre = fopen(name_1,"a");
+      fprintf (log_pre, "%8E %9d\n", t, i);
+      fclose(log_pre);
+    }
+    
+    // exit
+    return 1;
   }
+
 }
 
 void maxruntime (int * argc, char * argv[])
