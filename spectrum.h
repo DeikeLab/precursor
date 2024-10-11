@@ -4,8 +4,8 @@
 The initial condition is a random broad-banded wave field based on externally imported power spectrum. Some spectrum related variables: */
 
 //#define N_mode_ 32 // Corresponds to input of 32 modes in kx and 33 modes in ky. This number has to match the files being read in
-#define N_mode_ 64 // Corresponds to input of 32 modes in kx and 33 modes in ky. This number has to match the files being read in
-//#define N_mode_ 192 
+//#define N_mode_ 64 // Corresponds to input of 32 modes in kx and 33 modes in ky. This number has to match the files being read in
+#define N_mode_ 192 
 /*
 // Corresponds to input of 64 modes in kx and 65 modes in ky. This number has to match the files being read in
 //double F_kxky_[N_mode_*(N_mode_+1)], omega[N_mode_*(N_mode_+1)], \
@@ -55,7 +55,9 @@ void power_input() {
     char filename[100];
     sprintf (filename, "F_kxky");
     FILE * fp = fopen (filename, "rb");
-    fread (a, sizeof(float), length2D, fp);
+    int length2D_exp = fread (a, sizeof(float), length2D, fp);
+    fprintf(stderr, " length2D_exp = %d\n ", length2D_exp), fflush (stderr);
+    fprintf(stderr, " length2D = %d\n ", length2D), fflush (stderr);
     for (int i=0;i<length2D;i++) {
       F_kxky_[i] = (double)a[i];
     }
@@ -66,8 +68,10 @@ void power_input() {
     length1D = N_mode_;
     float * b1 = (float*) malloc (sizeof(float)*length1D);
     sprintf (filename, "kx");
-    FILE *fp1 = fopen (filename, "rb");
-    fread (b1, sizeof(float), length1D, fp1);
+    FILE * fp1 = fopen (filename, "rb");
+    int length1D_b1_exp = fread (b1, sizeof(float), length1D, fp1);
+    fprintf(stderr, " length1D_b1_exp = %d\n ", length1D_b1_exp), fflush (stderr);
+    fprintf(stderr, " length1D_b1 = %d\n ", length1D), fflush (stderr);
     for (int i=0;i<length1D;i++) {
       kx_[i] = (double)b1[i];
     }
@@ -77,8 +81,10 @@ void power_input() {
     // One more mode in ky
     float * b2 = (float*) malloc (sizeof(float)*(length1D+1));
     sprintf (filename, "ky");
-    FILE *fp2 = fopen (filename, "rb");
-    fread (b2, sizeof(float), length1D+1, fp2);
+    FILE * fp2 = fopen (filename, "rb");
+    int length1D_b2_exp = fread (b2, sizeof(float), length1D+1, fp2);
+    fprintf(stderr, " length1D_b2_exp = %d\n ", length1D_b2_exp), fflush (stderr);
+    fprintf(stderr, " length1D_b2 = %d\n ", length1D+1), fflush (stderr);
     for (int i=0;i<length1D+1;i++) {
       ky_[i] = (double)b2[i];
     }
@@ -88,8 +94,8 @@ void power_input() {
     // Wave frequency omega, and randomly generated phase
     //double kmod = 0;
     int index = 0;
-    srand(RANDOM); // We can seed it differently for different runs
     fprintf(stderr, "RANDOM Num. is: %d\n", RANDOM), fflush (stderr);
+    srand(RANDOM); // We can seed it differently for different runs
     for (int i=0; i<N_mode_; i++) {
       for (int j=0; j<N_mode_+1; j++) {
 	index = j*N_mode_ + i;
