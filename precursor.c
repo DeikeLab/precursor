@@ -28,7 +28,7 @@ int do_en = 0;                         // dump or not different fields for ensem
 int st_wave = 1;                       // initialize or not a Stokes wave
 int RANDOM = 2;                        // random number for a narrowbanded wave field (relevant if st_wave = 0)
 int dump_now = 0;                      // dump a restarting file now 
-int N_mod = 64;                        // number of mode for the initial spectrum
+int N_mod = 192;                       // number of mode for the initial spectrum
 
 /**
    We define some values: 

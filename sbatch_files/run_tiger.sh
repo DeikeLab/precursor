@@ -29,7 +29,7 @@ do_en=0;
 st_wave=1;                    
 rand_num=2;                     
 dump_now=0;                   
-N_mod=64;                     
+N_mod=192;                     
 #
 srun precursor -m 23:59:00 $Re_ast $ak $r_L0lam $rho_r $mu_r $MAXLEVEL $MINLEVEL $f_uemax \
 	                   $Tf_ $do_en $st_wave $rand_num $dump_now $N_mod > out.log 2>&1
