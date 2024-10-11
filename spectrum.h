@@ -14,7 +14,6 @@ The initial condition is a random broad-banded wave field based on externally im
 double F_kxky_[N_mode_*(N_mode_+1)], phase[N_mode_*(N_mode_+1)];
 double kx_[N_mode_], ky_[N_mode_+1];
 double dkx_, dky_;
-//int RANDOM; // integer to seed random number generator (define in spectrum.h)
 
 /**
    Random number generator. */
