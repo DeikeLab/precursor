@@ -468,7 +468,7 @@ event init (i = 0) {
 event log_simulation (i += 10) {
   
   int min_level = +100, max_level = -100;
-  foreach(reduction(min:min_level),reduction(max:max_level)) {
+  foreach(reduction(min:min_level) reduction(max:max_level)) {
     max_level = max(max_level,level);
     min_level = min(min_level,level);
   }
