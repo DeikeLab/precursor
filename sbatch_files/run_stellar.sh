@@ -5,10 +5,6 @@
 #SBATCH --cpus-per-task=1           # cpu-cores per task (>1 if multi-threaded tasks)
 #SBATCH --mem-per-cpu=4G            # memory per cpu-core (4G is default)
 #SBATCH --time=23:59:00             # total run time limit (HH:MM:SS)
-##SBATCH --time=00:30:00             # total run time limit (HH:MM:SS)
-####SBATCH --mail-type=begin        # send email when job begins
-####SBATCH --mail-type=end          # send email when job ends
-####SBATCH --mail-user=ns8802@princeton.edu
 #
 #module load openmpi/gcc/4.1.0
 module load intel-mpi/gcc/2021.3.1
@@ -32,6 +28,10 @@ rand_num=2;
 dump_now=0;                   
 N_mod=192;                     
 #
-srun precursor -m 23:59:00 $Re_ast $ak $r_L0lam $rho_r $mu_r $MAXLEVEL $MINLEVEL $f_uemax \
-	                   $Tf_ $do_en $st_wave $rand_num $dump_now $N_mod > out.log 2>&1
+# Extract SBATCH time
+#
+SBATCH_TIME=$(grep -oP '(?<=#SBATCH --time=)[0-9:]*' $0)
+#
+srun precursor -m $SBATCH_TIME $Re_ast $ak $r_L0lam $rho_r $mu_r $MAXLEVEL $MINLEVEL $f_uemax \
+	                       $Tf_ $do_en $st_wave $rand_num $dump_now $N_mod > out.log 2>&1
 #

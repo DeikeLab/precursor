@@ -14,6 +14,7 @@ The initial condition is a random broad-banded wave field based on externally im
 double F_kxky_[N_mode_*(N_mode_+1)], phase[N_mode_*(N_mode_+1)];
 double kx_[N_mode_], ky_[N_mode_+1];
 double dkx_, dky_;
+//int RANDOM; // integer to seed random number generator (define in spectrum.h)
 
 /**
    Random number generator. */
@@ -26,13 +27,18 @@ double randInRange(int min, int max) {
 A MPI compatible function that reads in kx_, ky_, and F_kxky_. Next step is to generate F_kxky_ inside basilisk too. For now kx_, ky_ are 1D arrays while F_kxky_ is a 2D array. The root process reads in and then broadcast to all other processes. It looks for files named F_kxky, 
 */
 
-void power_input() {
+void power_input(int N_mod) {
 // Previously we were not reading in kx_, ky_.
 //  for (int i=0; i<N_mode_; i++) { 
 //     kx_[i] = 2.*pi/L0*(i+1); 
 //     ky_[i] = 2.*pi/L0*(i-N_mode_/2); 
 //  } 
 //  ky_[N_mode_] = 2.*pi/L0*N_mode_/2; 
+  
+  if (N_mod != N_mode_) {
+    fprintf(stderr, "The input N_mod is different from the prescribed N_mode=%d\n", N_mode_);
+    exit(1);
+  }
 
   int length1D, length2D; // The length of the array to be read
 
@@ -54,47 +60,53 @@ void power_input() {
     char filename[100];
     sprintf (filename, "F_kxky");
     FILE * fp = fopen (filename, "rb");
-    int length2D_exp = fread (a, sizeof(float), length2D, fp);
-    fprintf(stderr, " length2D_exp = %d\n ", length2D_exp), fflush (stderr);
-    fprintf(stderr, " length2D = %d\n ", length2D), fflush (stderr);
+    if (fread (a, sizeof(float), length2D, fp) != length2D) {
+      fprintf(stderr, "Error: Failed to read all the elements from F_kxky\n");
+      exit(1);
+    }
     for (int i=0;i<length2D;i++) {
       F_kxky_[i] = (double)a[i];
     }
     fclose (fp);
+    free(a);
     fprintf(stderr, "F_kxky loaded!\n"), fflush (stderr);
 
     // Then read in kx_, ky_
     length1D = N_mode_;
     float * b1 = (float*) malloc (sizeof(float)*length1D);
     sprintf (filename, "kx");
-    FILE * fp1 = fopen (filename, "rb");
-    int length1D_b1_exp = fread (b1, sizeof(float), length1D, fp1);
-    fprintf(stderr, " length1D_b1_exp = %d\n ", length1D_b1_exp), fflush (stderr);
-    fprintf(stderr, " length1D_b1 = %d\n ", length1D), fflush (stderr);
+    FILE *fp1 = fopen (filename, "rb");
+    if (fread (b1, sizeof(float), length1D, fp1) != length1D) {
+      fprintf(stderr, "Error: Failed to read all the elements from kx\n");
+      exit(1);
+    }
     for (int i=0;i<length1D;i++) {
       kx_[i] = (double)b1[i];
     }
     fclose (fp1);
+    free(b1);
     fprintf(stderr, "kx loaded!\n"), fflush (stderr);
 
     // One more mode in ky
     float * b2 = (float*) malloc (sizeof(float)*(length1D+1));
     sprintf (filename, "ky");
-    FILE * fp2 = fopen (filename, "rb");
-    int length1D_b2_exp = fread (b2, sizeof(float), length1D+1, fp2);
-    fprintf(stderr, " length1D_b2_exp = %d\n ", length1D_b2_exp), fflush (stderr);
-    fprintf(stderr, " length1D_b2 = %d\n ", length1D+1), fflush (stderr);
+    FILE *fp2 = fopen (filename, "rb");
+    if (fread (b2, sizeof(float), length1D+1, fp2) != length1D+1) {
+      fprintf(stderr, "Error: Failed to read all the elements from ky\n");
+      exit(1);
+    }
     for (int i=0;i<length1D+1;i++) {
       ky_[i] = (double)b2[i];
     }
     fclose (fp2);
+    free(b2);
     fprintf(stderr, "ky loaded!\n"), fflush (stderr);
 
     // Wave frequency omega, and randomly generated phase
     //double kmod = 0;
     int index = 0;
-    fprintf(stderr, "RANDOM Num. is: %d\n", RANDOM), fflush (stderr);
     srand(RANDOM); // We can seed it differently for different runs
+    fprintf(stderr, "RANDOM Num. is: %d\n", RANDOM), fflush (stderr);
     for (int i=0; i<N_mode_; i++) {
       for (int j=0; j<N_mode_+1; j++) {
 	index = j*N_mode_ + i;

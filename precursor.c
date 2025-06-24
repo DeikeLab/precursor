@@ -28,7 +28,7 @@ int do_en = 0;                         // dump or not different fields for ensem
 int st_wave = 1;                       // initialize or not a Stokes wave
 int RANDOM = 2;                        // random number for a narrowbanded wave field (relevant if st_wave = 0)
 int dump_now = 0;                      // dump a restarting file now 
-int N_mod = 192;                       // number of mode for the initial spectrum
+int N_mod = 64;                        // number of mode for the initial spectrum
 
 /**
    We define some values: 
@@ -117,8 +117,8 @@ void set_profile (scalar cs, face vector fs, vertex scalar phi) {
 }
 
 #include "./spectrum.h" // Used for new input method (the spectrum info)
-void import_profile (scalar cs, face vector fs, vertex scalar phi) {
-  power_input();
+void import_profile (int N_mod, scalar cs, face vector fs, vertex scalar phi) {
+  power_input(N_mod);
   dkx_ = kx_[1] - kx_[0];
   dky_ = ky_[1] - ky_[0];
   fprintf (stderr, "dkx = %g, dky = %g\n", dkx_, dky_), fflush (stderr);
@@ -368,7 +368,7 @@ event init (i = 0) {
     }
     else {
       fprintf(stderr, "We import a profile previously generated!\n"), fflush (stderr);
-      import_profile (cs,fs,phi);
+      import_profile (N_mod,cs,fs,phi);
     }
   }
   else {
@@ -381,7 +381,7 @@ event init (i = 0) {
     }
     else {
       fprintf(stderr, "We import a profile previously generated!\n"), fflush (stderr);
-      import_profile (cs,fs,phi);
+      import_profile (N_mod,cs,fs,phi);
     }
     double y_ast = (L0-h_)/Re_ast;
     double Ubulk_ex = (mu2/(rho2*(L0-h_)))*(pow(0.5*Re_ast/0.09,(1.0/0.88))); // estimation based on Pope's relation 
@@ -410,6 +410,7 @@ event init (i = 0) {
 #endif
   }
 
+  boundary({u.x,u.y,cs});
   clear();
   view (fov = 27.5,  
         theta = pi/4.0, phi = pi/50.0, psi = 0.0, ty = -0.5,
@@ -605,6 +606,7 @@ event acceleration (i++) {
 
 event movies (t += 5.0*Tf_) {
   
+  boundary({u.x,u.y,u.z,cs});
   clear();
   view (fov = 27.5,  
         theta = pi/4.0, phi = pi/50.0, psi = 0.0, ty = -0.5,
