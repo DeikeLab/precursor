@@ -123,7 +123,7 @@ void import_profile (int N_mod, scalar cs, face vector fs, vertex scalar phi) {
   dky_ = ky_[1] - ky_[0];
   fprintf (stderr, "dkx = %g, dky = %g\n", dkx_, dky_), fflush (stderr);
   foreach_vertex() {
-    phi[] = y-(wave(x,z)+h_);
+    phi[] = y-(wave(x,z,N_mod)+h_);
   }
   fractions (phi,cs,fs);
   fractions_cleanup (cs,fs); // remove inconsistencies
@@ -368,7 +368,9 @@ event init (i = 0) {
     }
     else {
       fprintf(stderr, "We import a profile previously generated!\n"), fflush (stderr);
+      allocate_arrays (N_mod);
       import_profile (N_mod,cs,fs,phi);
+      free_arrays ();
     }
   }
   else {
@@ -381,7 +383,9 @@ event init (i = 0) {
     }
     else {
       fprintf(stderr, "We import a profile previously generated!\n"), fflush (stderr);
+      allocate_arrays (N_mod);
       import_profile (N_mod,cs,fs,phi);
+      free_arrays ();
     }
     double y_ast = (L0-h_)/Re_ast;
     double Ubulk_ex = (mu2/(rho2*(L0-h_)))*(pow(0.5*Re_ast/0.09,(1.0/0.88))); // estimation based on Pope's relation 

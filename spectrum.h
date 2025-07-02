@@ -1,20 +1,107 @@
 /**
-# PM spectrum read-in and wave field initialization functions
+# Spectrum read-in and wave field initialization functions */
 
-The initial condition is a random broad-banded wave field based on externally imported power spectrum. Some spectrum related variables: */
-
-//#define N_mode_ 32 // Corresponds to input of 32 modes in kx and 33 modes in ky. This number has to match the files being read in
-//#define N_mode_ 64 // Corresponds to input of 32 modes in kx and 33 modes in ky. This number has to match the files being read in
-#define N_mode_ 192 
-/*
-// Corresponds to input of 64 modes in kx and 65 modes in ky. This number has to match the files being read in
-//double F_kxky_[N_mode_*(N_mode_+1)], omega[N_mode_*(N_mode_+1)], \
-//  phase[N_mode_*(N_mode_+1)];
-*/
-double F_kxky_[N_mode_*(N_mode_+1)], phase[N_mode_*(N_mode_+1)];
-double kx_[N_mode_], ky_[N_mode_+1];
+// Declare pointers globally or pass via arguments
+double *F_kxky_, *phase_;
+double *kx_, *ky_;
 double dkx_, dky_;
-//int RANDOM; // integer to seed random number generator (define in spectrum.h)
+
+/**
+   Allocate arrays based on N_mode_ */
+
+void allocate_arrays(int N_mode_) {
+  size_t N2D = N_mode_ * (N_mode_ + 1);
+  size_t N1D = N_mode_;
+
+  F_kxky_ = (double *) malloc(N2D * sizeof(double));
+  phase_  = (double *) malloc(N2D * sizeof(double));
+  kx_     = (double *) malloc(N1D * sizeof(double));
+  ky_     = (double *) malloc((N1D + 1) * sizeof(double));
+
+  if (!F_kxky_ || !phase_ || !kx_ || !ky_) {
+    fprintf(stderr, "Memory allocation failed!\n");
+    exit(EXIT_FAILURE);
+  }
+}
+
+/**
+   Deallocate them */
+
+void free_arrays() {
+  if (F_kxky_) free(F_kxky_);
+  if (phase_)  free(phase_);
+  if (kx_)     free(kx_);
+  if (ky_)     free(ky_);
+
+  F_kxky_ = NULL;
+  phase_  = NULL;
+  kx_     = NULL;
+  ky_     = NULL;
+}
+
+/**
+   Function to read it */
+
+void load_array(char *filename, double *target, int expected_count, char *label) {
+  float *buffer = (float *) malloc(expected_count * sizeof(float));
+  if (!buffer) {
+    fprintf(stderr, "Fatal error: malloc failed for buffer loading '%s'\n", filename);
+#if _MPI
+    MPI_Abort(MPI_COMM_WORLD, 1);
+#else
+    exit(1);
+#endif
+  }
+  FILE *fp = fopen(filename, "rb");
+  if (!fp) {
+    fprintf(stderr, "Fatal error: cannot open file '%s'\n", filename);
+#if _MPI
+    MPI_Abort(MPI_COMM_WORLD, 1);
+#else
+    exit(1);
+#endif
+  }
+
+  fseek(fp, 0, SEEK_END);
+  long file_size = ftell(fp);
+  rewind(fp);
+
+  long expected_size = expected_count * sizeof(float);
+  if (file_size != expected_size) {
+    fprintf(stderr,
+        "Fatal error: file '%s' has size %ld bytes, expected %ld bytes\n",
+        filename, file_size, expected_size);
+    fclose(fp);
+#if _MPI
+    MPI_Abort(MPI_COMM_WORLD, 1);
+#else
+    exit(1);
+#endif
+  }
+
+  size_t read_count = fread(buffer, sizeof(float), expected_count, fp);
+  fclose(fp);
+  if (read_count != (size_t)expected_count) {
+    fprintf(stderr,
+        "Fatal error: expected %d elements in '%s', but read %zu\n",
+        expected_count, filename, read_count);
+    free(buffer);
+#if _MPI
+    MPI_Abort(MPI_COMM_WORLD, 1);
+#else
+    exit(1);
+#endif
+  }
+
+  for (int i = 0; i < expected_count; i++) {
+    target[i] = (double) buffer[i];
+  }
+  
+  free(buffer);
+
+  fprintf(stderr, "%s loaded from '%s'\n", label, filename);
+  fflush(stderr);
+}
 
 /**
    Random number generator. */
@@ -24,251 +111,75 @@ double randInRange(int min, int max) {
 }
 
 /** 
-A MPI compatible function that reads in kx_, ky_, and F_kxky_. Next step is to generate F_kxky_ inside basilisk too. For now kx_, ky_ are 1D arrays while F_kxky_ is a 2D array. The root process reads in and then broadcast to all other processes. It looks for files named F_kxky, 
-*/
+A MPI compatible function that reads in kx_, ky_, and F_kxky_. Next step is to generate F_kxky_ inside basilisk too. For now kx_, ky_ are 1D arrays while F_kxky_ is a 2D array. The root process reads in and then broadcast to all other processes. It looks for files named F_kxky, */
 
-void power_input(int N_mod) {
-// Previously we were not reading in kx_, ky_.
-//  for (int i=0; i<N_mode_; i++) { 
-//     kx_[i] = 2.*pi/L0*(i+1); 
-//     ky_[i] = 2.*pi/L0*(i-N_mode_/2); 
-//  } 
-//  ky_[N_mode_] = 2.*pi/L0*N_mode_/2; 
-  
-  if (N_mod != N_mode_) {
-    fprintf(stderr, "The input N_mod is different from the prescribed N_mode=%d\n", N_mode_);
-    exit(1);
-  }
+void power_input(int N_mode_) {
 
-  int length1D, length2D; // The length of the array to be read
+  int length1D = N_mode_;
+  int length2D = N_mode_*(N_mode_+1);
 
-/* If using MPI. **/
-#if _MPI 
-  //char message[20];
-  //int i, rank, size;
+#if _MPI
+
   int rank, size;
-  //MPI_Status status;
   int root = 0;
   MPI_Comm_size(MPI_COMM_WORLD, &size);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
   // Read in on the zeroth thread
   if (rank == root) {
-    // First read in F_kxky_
-    length2D = N_mode_*(N_mode_+1);
-    float * a = (float*) malloc (sizeof(float)*length2D);
-    char filename[100];
-    sprintf (filename, "F_kxky");
-    FILE * fp = fopen (filename, "rb");
-    if (fread (a, sizeof(float), length2D, fp) != length2D) {
-      fprintf(stderr, "Error: Failed to read all the elements from F_kxky\n");
-      exit(1);
-    }
-    for (int i=0;i<length2D;i++) {
-      F_kxky_[i] = (double)a[i];
-    }
-    fclose (fp);
-    free(a);
-    fprintf(stderr, "F_kxky loaded!\n"), fflush (stderr);
-
-    // Then read in kx_, ky_
-    length1D = N_mode_;
-    float * b1 = (float*) malloc (sizeof(float)*length1D);
-    sprintf (filename, "kx");
-    FILE *fp1 = fopen (filename, "rb");
-    if (fread (b1, sizeof(float), length1D, fp1) != length1D) {
-      fprintf(stderr, "Error: Failed to read all the elements from kx\n");
-      exit(1);
-    }
-    for (int i=0;i<length1D;i++) {
-      kx_[i] = (double)b1[i];
-    }
-    fclose (fp1);
-    free(b1);
-    fprintf(stderr, "kx loaded!\n"), fflush (stderr);
-
-    // One more mode in ky
-    float * b2 = (float*) malloc (sizeof(float)*(length1D+1));
-    sprintf (filename, "ky");
-    FILE *fp2 = fopen (filename, "rb");
-    if (fread (b2, sizeof(float), length1D+1, fp2) != length1D+1) {
-      fprintf(stderr, "Error: Failed to read all the elements from ky\n");
-      exit(1);
-    }
-    for (int i=0;i<length1D+1;i++) {
-      ky_[i] = (double)b2[i];
-    }
-    fclose (fp2);
-    free(b2);
-    fprintf(stderr, "ky loaded!\n"), fflush (stderr);
-
-    // Wave frequency omega, and randomly generated phase
-    //double kmod = 0;
+    load_array("F_kxky", F_kxky_, length2D  , "F_kxky_");
+    load_array("kx",     kx_,     length1D  , "kx_");
+    load_array("ky",     ky_,     length1D+1, "ky_");
+    
     int index = 0;
     srand(RANDOM); // We can seed it differently for different runs
     fprintf(stderr, "RANDOM Num. is: %d\n", RANDOM), fflush (stderr);
     for (int i=0; i<N_mode_; i++) {
       for (int j=0; j<N_mode_+1; j++) {
 	index = j*N_mode_ + i;
-	//kmod = sqrt(sq(kx_[i]) + sq(ky_[j]));
-	//omega[index] = sqrt(g_*kmod);
-	phase[index] = randInRange (0, 2.*pi);
+	phase_[index] = randInRange (0, 2.*pi);
       }
     }
   }
+
   // Broadcast to other threads
-  MPI_Bcast(&kx_, length1D, MPI_DOUBLE, root, MPI_COMM_WORLD);
-  MPI_Bcast(&ky_, length1D+1, MPI_DOUBLE, root, MPI_COMM_WORLD);
-  MPI_Bcast(&F_kxky_, length2D, MPI_DOUBLE, root, MPI_COMM_WORLD);
-  //MPI_Bcast(&omega, length2D, MPI_DOUBLE, root, MPI_COMM_WORLD);
-  MPI_Bcast(&phase, length2D, MPI_DOUBLE, root, MPI_COMM_WORLD);
+  MPI_Bcast(kx_    , length1D  , MPI_DOUBLE, root, MPI_COMM_WORLD);
+  MPI_Bcast(ky_    , length1D+1, MPI_DOUBLE, root, MPI_COMM_WORLD);
+  MPI_Bcast(F_kxky_, length2D  , MPI_DOUBLE, root, MPI_COMM_WORLD);
+  MPI_Bcast(phase_ , length2D  , MPI_DOUBLE, root, MPI_COMM_WORLD);
+  fprintf(stderr, "The MPIBcast is done!\n"), fflush (stderr);
 
-  // Make sure that the inputs are correct by printing them out
-  /*
-  char checkout[100]; 
-  sprintf (checkout, "F-%d", pid()); 
-  FILE * fout = fopen (checkout, "w");
-  for (int i=0; i<length2D; i++) 
-    fprintf (fout, "%g ", F_kxky_[i]); 
-  fclose (fout); 
-  sprintf (checkout, "ky-%d", pid()); 
-  fout = fopen (checkout, "w"); 
-  for (int i=0; i<length1D+1; i++) 
-    fprintf (fout, "%g ", ky_[i]); 
-  fclose (fout);
-  char checkout[100]; 
-  sprintf (checkout, "phase/phase-%d", pid()); 
-  FILE * fout = fopen (checkout, "w");
-  for (int i=0; i<length2D; i++) 
-    fprintf (fout, "%g ", phase[i]); 
-  fclose (fout); 
-  */
-
-/**
-   If not using MPI. */ 
 #else
-  //int length2D = N_mode_*(N_mode_+1);
-  length2D = N_mode_*(N_mode_+1);
-  float * a = (float*) malloc (sizeof(float)*length2D);
-  char filename[100];
-  sprintf (filename, "F_kxky");
-  FILE * fp = fopen (filename, "rb");
-  fread (a, sizeof(float), length2D, fp);
-  for (int i=0;i<length2D;i++) {
-    F_kxky_[i] = (double)a[i];
-  }
-  fclose (fp);
+  
+  load_array("F_kxky", F_kxky_, length2D  , "F_kxky_");
+  load_array("kx",     kx_,     length1D  , "kx_");
+  load_array("ky",     ky_,     length1D+1, "ky_");
 
-  // Then read in kx_, ky_
-  length1D = N_mode_;
-  float * b1 = (float*) malloc (sizeof(float)*length1D);
-  sprintf (filename, "kx");
-  FILE *fp1 = fopen (filename, "rb");
-  fread (b1, sizeof(float), length1D, fp1);
-  for (int i=0;i<length1D;i++) {
-    kx_[i] = (double)b1[i];
-  }
-  fclose (fp1);
-
-  // One more mode in ky
-  float * b2 = (float*) malloc (sizeof(float)*(length1D+1));
-  sprintf (filename, "ky");
-  FILE *fp2 = fopen (filename, "rb");
-  fread (b2, sizeof(float), length1D+1, fp2);
-  for (int i=0;i<length1D+1;i++) {
-    ky_[i] = (double)b2[i];
-  }
-  fclose (fp2);
-
-  //// Phase and omega, next focusing phase
-  // Phase, next focusing phase
-  double kmod = 0;
   int index = 0;
   srand(RANDOM); // We can seed it differently for different runs
   for (int i=0; i<N_mode_;i++) {
     for (int j=0;j<N_mode_+1;j++) {
       index = j*N_mode_ + i;
-      kmod = sqrt(sq(kx_[i]) + sq(ky_[j]));
-      //omega[index] = sqrt(g_*kmod);
-      phase[index] = randInRange (0, 2.*pi);
+      phase_[index] = randInRange (0, 2.*pi);
     }
   }
+
 #endif
+
 }
 
 /**
    Functions that compute the orbital velocity (based on linear wave equations). */
-double wave (double x, double y)
-{
+
+double wave (double x, double y, int N_mode_) {
   double eta = 0;
-  double ampl = 0, a = 0;
-  int index = 0;
   for (int i=0; i<N_mode_; i++) {
     for (int j=0; j<N_mode_+1; j++) {
-      index = j*N_mode_ + i;
-      ampl = sqrt(2.*F_kxky_[index]*dkx_*dky_);
-      a = (kx_[i]*x + ky_[j]*y + phase[index]);
+      int index = j*N_mode_ + i;
+      double ampl = sqrt(2.*F_kxky_[index]*dkx_*dky_);
+      double a = (kx_[i]*x + ky_[j]*y + phase_[index]);
       eta += ampl*cos(a);
     }
   }
   return eta;
 }
-
-/*
-double uin_x (double x, double y, double z) {
-  int index = 0;
-  double uin_x = 0;
-  double ampl = 0, a = 0;
-  double z_actual = 0, kmod = 0, theta = 0;
-  for (int i=0; i<N_mode_; i++) {
-    for (int j=0; j<N_mode_+1; j++) {
-      index = j*N_mode_ + i;
-      ampl = sqrt(2.*F_kxky_[index]*dkx_*dky_);
-      z_actual = (z < ampl ? (z) : ampl);
-      // fprintf(stderr, "z = %g, ampl = %g, z_actual = %g\n", z, ampl, z_actual);
-      kmod = sqrt(sq(kx_[i]) + sq(ky_[j]));
-      theta = atan(ky_[j]/kx_[i]);
-      a = (kx_[i]*x + ky_[j]*y + phase[index]);
-      uin_x += sqrt(g_*kmod)*ampl*exp(kmod*z_actual)*cos(a)*cos(theta);
-    }
-  }
-  return uin_x;
-}
-
-double uin_y (double x, double y, double z) {
-  int index = 0;
-  double uin_y = 0;
-  double ampl = 0, a = 0;
-  double z_actual = 0, kmod = 0, theta = 0;
-  for (int i=0; i<N_mode_; i++) {
-    for (int j=0; j<N_mode_+1; j++) {
-      index = j*N_mode_ + i;
-      ampl = sqrt(2.*F_kxky_[index]*dkx_*dky_);
-      z_actual = (z < ampl ? (z) : ampl);
-      kmod = sqrt(sq(kx_[i]) + sq(ky_[j]));
-      theta = atan(ky_[j]/kx_[i]);
-      a = (kx_[i]*x + ky_[j]*y + phase[index]);
-      uin_y += sqrt(g_*kmod)*ampl*exp(kmod*z_actual)*cos(a)*sin(theta);
-    }
-  }
-  return uin_y;
-}
-
-double uin_z (double x, double y, double z) {
-  int index = 0;
-  double uin_z = 0;
-  double ampl = 0, a = 0;
-  double z_actual = 0, kmod = 0;
-  for (int i=0; i<N_mode_; i++) {
-    for (int j=0; j<N_mode_+1; j++) {
-      index = j*N_mode_ + i;
-      ampl = sqrt(2.*F_kxky_[index]*dkx_*dky_);
-      z_actual = (z < ampl ? (z) : ampl);
-      kmod = sqrt(sq(kx_[i]) + sq(ky_[j]));
-      a = (kx_[i]*x + ky_[j]*y + phase[index]);
-      uin_z += sqrt(g_*kmod)*ampl*exp(kmod*z_actual)*sin(a);
-    }
-  }
-  return uin_z;
-}
-*/
