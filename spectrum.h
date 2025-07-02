@@ -1,7 +1,6 @@
 /**
 # Spectrum read-in and wave field initialization functions */
 
-// Declare pointers globally or pass via arguments
 double *F_kxky_, *phase_;
 double *kx_, *ky_;
 double dkx_, dky_;
@@ -111,7 +110,7 @@ double randInRange(int min, int max) {
 }
 
 /** 
-A MPI compatible function that reads in kx_, ky_, and F_kxky_. Next step is to generate F_kxky_ inside basilisk too. For now kx_, ky_ are 1D arrays while F_kxky_ is a 2D array. The root process reads in and then broadcast to all other processes. It looks for files named F_kxky, */
+A MPI compatible function that reads in kx_, ky_, and F_kxky_. For now kx_, ky_ are 1D arrays while F_kxky_ is a 2D array. The root process reads in and then broadcast to all other processes. It looks for files named F_kxky, kx, ky. If they are absent, it returns an error. */
 
 void power_input(int N_mode_) {
 
